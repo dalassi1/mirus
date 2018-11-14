@@ -8,7 +8,6 @@
 
 package com.salesforce.mirus;
 
-import com.salesforce.mirus.config.TaskConfig;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -16,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -29,6 +29,8 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.salesforce.mirus.config.TaskConfig;
 
 interface ConsumerFactory {
   Consumer<byte[], byte[]> newConsumer(Map<String, Object> consumerProperties);
@@ -131,9 +133,12 @@ public class MirusSourceTask extends SourceTask {
               new TopicPartition(
                   (String) partitionMap.get(TopicPartitionSerDe.KEY_TOPIC),
                   (int) partitionMap.get(TopicPartitionSerDe.KEY_PARTITION));
-          if (offsetMap == null) {
-            // No offsets available so seek to start or end (need to do this explicitly if manually
-            // seeking).
+
+          // check if offset has been set to null, i.e. tombstone record
+          // or if no offset record at all
+          if (offsetMap == null || offsetMap.get(KEY_OFFSET) == null) {
+            // No offsets available so seek to start or end
+            // (need to do this explicitly if manually seeking).
             String offsetReset = (String) consumerProperties.get("auto.offset.reset");
             if ("latest".equalsIgnoreCase(offsetReset)) {
               logger.trace("Seeking to end");
@@ -146,12 +151,8 @@ public class MirusSourceTask extends SourceTask {
               long pos = consumer.position(tp);
               logger.trace("{} at position {}", tp, pos);
             }
-            return;
-          }
-          Long lastRecordedOffset = (Long) offsetMap.get(KEY_OFFSET);
-          // check if offset has been set to null, i.e. tombstone record
-          if (lastRecordedOffset != null) {
-            consumer.seek(tp, lastRecordedOffset);
+          } else {
+            consumer.seek(tp, (Long) offsetMap.get(KEY_OFFSET));
           }
         });
   }

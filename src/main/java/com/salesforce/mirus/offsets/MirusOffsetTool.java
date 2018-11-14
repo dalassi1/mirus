@@ -64,7 +64,7 @@ public class MirusOffsetTool {
     if (args.resetOffsets && (args.fromFile == null || args.fromFile.isEmpty())) {
       throw new ParameterException("--reset-offsets requires --from-file to be set");
     }
-    if (args.writeNullOffsets && !args.describe) {
+    if (args.showNullOffsets && !args.describe) {
       throw new ParameterException("--show-nulls requires --describe to be set");
     }
 
@@ -104,10 +104,7 @@ public class MirusOffsetTool {
         Stream<OffsetInfo> offsetInfos =
             offsetFetcher
                 .readOffsets()
-                .filter(
-                    offsetInfo ->
-                        offsetInfo.offset != null
-                            || (offsetInfo.offset == null && args.writeNullOffsets));
+                .filter(offsetInfo -> offsetInfo.offset != null || args.showNullOffsets);
         offsetSerDe.write(offsetInfos, System.out);
       } finally {
         offsetFetcher.stop();
@@ -136,7 +133,7 @@ public class MirusOffsetTool {
     @Parameter(
         names = {"--show-nulls"},
         description = "Include records with null offsets (tombstone records). Requires --describe ")
-    boolean writeNullOffsets = false;
+    boolean showNullOffsets = false;
 
     @Parameter(
         names = {"--reset-offsets"},
